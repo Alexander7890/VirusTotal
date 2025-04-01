@@ -1,4 +1,3 @@
-using System;
 using System.Collections.Generic;
 using System.IO;
 using System.Linq;
@@ -9,6 +8,7 @@ using VirusTotalNet;
 using VirusTotalNet.Results;
 using VirusTotalNet.ResponseCodes;
 using VirusTotalNet.Objects;
+using System.Security.Cryptography;
 
 namespace VirusTotalWinForms
 {
@@ -26,6 +26,7 @@ namespace VirusTotalWinForms
             virusTotal.UseTLS = true;
             LoadResults();
         }
+
         private void LoadResults()
         {
             if (File.Exists(ResultFilePath))
@@ -35,7 +36,56 @@ namespace VirusTotalWinForms
             }
         }
 
-        private async Task ScanFileAsync(string filePath)
+        private async Task ScanOrGetReportAsync(string filePath)
+        {
+            listBoxResults.Items.Add($"🔍 Перевірка файлу: {Path.GetFileName(filePath)}...");
+
+            // Отримуємо SHA256 файлу
+            string fileHash = ComputeSHA256(filePath);
+
+            // 1. Швидка перевірка за хешем (15 сек)
+            FileReport fileReport = await virusTotal.GetFileReportAsync(fileHash);
+
+            if (fileReport.ResponseCode == FileReportResponseCode.Present)
+            {
+                await ShowReportAsync(fileReport, filePath);
+                return;
+            }
+
+            // 2. Файл не знайдено у базі → Запитуємо користувача
+            DialogResult result = MessageBox.Show(
+                $"Файл {Path.GetFileName(filePath)} відсутній у базі VirusTotal.\n" +
+                "Бажаєте відправити його на детальну перевірку? Це займе ~2 хвилини.",
+                "Підтвердження",
+                MessageBoxButtons.YesNo,
+                MessageBoxIcon.Question
+            );
+
+            if (result == DialogResult.Yes)
+            {
+                // 3. Використовуємо детальну перевірку (шифрування + 2 хв очікування)
+                await ScanFileWithEncryptionAsync(filePath);
+            }
+            else
+            {
+                // 4. Повторна перевірка через 15 сек
+                listBoxResults.Items.Add($"⏳ Повторна перевірка через 15 сек...");
+                await Task.Delay(15000);
+
+                fileReport = await virusTotal.GetFileReportAsync(fileHash);
+                if (fileReport.ResponseCode == FileReportResponseCode.Present)
+                {
+                    await ShowReportAsync(fileReport, filePath);
+                }
+                else
+                {
+                    listBoxResults.Items.Add($"❌ Файл {Path.GetFileName(filePath)} не знайдено у VirusTotal. Перевірка завершена.");
+                }
+            }
+        }
+
+
+        private async Task ScanFileWithEncryptionAsync(string filePath)
         {
             listBoxResults.Items.Add($"📤 Відправка {Path.GetFileName(filePath)} на перевірку...");
 
@@ -45,9 +95,9 @@ namespace VirusTotalWinForms
             if (scanResult.ResponseCode == ScanFileResponseCode.Queued)
             {
                 listBoxResults.Items.Add($"⏳ Очікування (~2 хв) обробки {Path.GetFileName(filePath)}...");
-                await Task.Delay(120000); // Очікуємо 2 хв (120 сек)
+                await Task.Delay(120000); // 2 хвилини очікування
 
-                // Після очікування отримуємо звіт
+                // Отримання звіту
                 await GetReportAsync(scanResult.Resource, filePath);
             }
             else
@@ -94,17 +144,17 @@ namespace VirusTotalWinForms
 
             report.AppendLine("======================================================");
 
-            // Збереження результатів у файл
             File.AppendAllText(ResultFilePath, report.ToString() + Environment.NewLine);
             listBoxResults.Items.Add($"✅ {Path.GetFileName(filePath)} → Аналіз завершено");
         }
+
         private async void button1_Click_1(object sender, EventArgs e)
         {
             using (OpenFileDialog openFileDialog = new OpenFileDialog { Multiselect = true })
             {
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    List<Task> tasks = openFileDialog.FileNames.Select(ScanFileAsync).ToList();
+                    List<Task> tasks = openFileDialog.FileNames.Select(ScanOrGetReportAsync).ToList();
                     await Task.WhenAll(tasks);
                 }
             }
@@ -154,5 +204,15 @@ namespace VirusTotalWinForms
                 }
             }
         }
+        private static string ComputeSHA256(string filePath)
+        {
+            using (var sha256 = SHA256.Create())
+            using (var stream = File.OpenRead(filePath))
+            {
+                byte[] hash = sha256.ComputeHash(stream);
+                return BitConverter.ToString(hash).Replace("-", "").ToLower();
+            }
+        }
+
     }
 }
