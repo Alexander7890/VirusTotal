@@ -39,9 +39,9 @@
             // 
             listBoxResults.FormattingEnabled = true;
             listBoxResults.ItemHeight = 15;
-            listBoxResults.Location = new Point(168, 104);
+            listBoxResults.Location = new Point(12, 12);
             listBoxResults.Name = "listBoxResults";
-            listBoxResults.Size = new Size(120, 94);
+            listBoxResults.Size = new Size(396, 424);
             listBoxResults.TabIndex = 0;
             // 
             // button1
@@ -72,7 +72,6 @@
             button3.TabIndex = 3;
             button3.Text = "button3";
             button3.UseVisualStyleBackColor = true;
-            button3.Click += button3_Click_1;
             // 
             // button4
             // 
@@ -82,7 +81,6 @@
             button4.TabIndex = 4;
             button4.Text = "button4";
             button4.UseVisualStyleBackColor = true;
-            button4.Click += button4_Click_1;
             // 
             // Form1
             // 

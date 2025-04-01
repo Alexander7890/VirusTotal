@@ -2,6 +2,7 @@ using System.Collections.Generic;
 using System.IO;
 using System.Linq;
 using System.Text;
+using System.Threading;
 using System.Threading.Tasks;
 using System.Windows.Forms;
 using VirusTotalNet;
@@ -17,7 +18,9 @@ namespace VirusTotalWinForms
         private const string ApiKey = "4ff03d06d0beaa010e499cd2d28bdf94da10451698b230f708895418cafe0d86";
         private const string ResultFilePath = "results.txt";
 
-        private VirusTotal virusTotal;
+
+        private readonly VirusTotal virusTotal;
+        private readonly SemaphoreSlim semaphore = new SemaphoreSlim(4); // Дозволяє одночасно запускати 4 файлів
 
         public Form1()
         {
@@ -38,52 +41,66 @@ namespace VirusTotalWinForms
 
         private async Task ScanOrGetReportAsync(string filePath)
         {
-            listBoxResults.Items.Add($"🔍 Перевірка файлу: {Path.GetFileName(filePath)}...");
-
-            // Отримуємо SHA256 файлу
-            string fileHash = ComputeSHA256(filePath);
-
-            // 1. Швидка перевірка за хешем (15 сек)
-            FileReport fileReport = await virusTotal.GetFileReportAsync(fileHash);
-
-            if (fileReport.ResponseCode == FileReportResponseCode.Present)
+            await semaphore.WaitAsync(); // Чекаємо на доступний слот
+            try
             {
-                await ShowReportAsync(fileReport, filePath);
-                return;
-            }
+                FileInfo fileInfo = new FileInfo(filePath);
+                if (fileInfo.Length > 32766 * 1024) // Перевірка на розмір файлу
+                {
+                    MessageBox.Show("Файл перевищує максимальний розмір (32 MB) для завантаження на VirusTotal.", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+                    return;
+                }
 
-            // 2. Файл не знайдено у базі → Запитуємо користувача
-            DialogResult result = MessageBox.Show(
-                $"Файл {Path.GetFileName(filePath)} відсутній у базі VirusTotal.\n" +
-                "Бажаєте відправити його на детальну перевірку? Це займе ~2 хвилини.",
-                "Підтвердження",
-                MessageBoxButtons.YesNo,
-                MessageBoxIcon.Question
-            );
+                listBoxResults.Items.Add($"🔍 Перевірка файлу: {Path.GetFileName(filePath)}...");
 
-            if (result == DialogResult.Yes)
-            {
-                // 3. Використовуємо детальну перевірку (шифрування + 2 хв очікування)
-                await ScanFileWithEncryptionAsync(filePath);
-            }
-            else
-            {
-                // 4. Повторна перевірка через 15 сек
-                listBoxResults.Items.Add($"⏳ Повторна перевірка через 15 сек...");
-                await Task.Delay(15000);
+                // Отримуємо SHA256 файлу
+                string fileHash = ComputeSHA256(filePath);
 
-                fileReport = await virusTotal.GetFileReportAsync(fileHash);
+                // Швидка перевірка за хешем
+                FileReport fileReport = await virusTotal.GetFileReportAsync(fileHash);
+
                 if (fileReport.ResponseCode == FileReportResponseCode.Present)
                 {
                     await ShowReportAsync(fileReport, filePath);
+                    return;
+                }
+
+                // Якщо файл не знайдений, пропонувати детальну перевірку
+                DialogResult result = MessageBox.Show(
+                    $"Файл {Path.GetFileName(filePath)} відсутній у базі VirusTotal.\n" +
+                    "Бажаєте відправити його на детальну перевірку? Це займе ~1 хвилини.",
+                    "Підтвердження",
+                    MessageBoxButtons.YesNo,
+                    MessageBoxIcon.Question
+                );
+
+                if (result == DialogResult.Yes)
+                {
+                    // Використовуємо детальну перевірку
+                    await ScanFileWithEncryptionAsync(filePath);
                 }
                 else
                 {
-                    listBoxResults.Items.Add($"❌ Файл {Path.GetFileName(filePath)} не знайдено у VirusTotal. Перевірка завершена.");
+                    // Повторна перевірка через деякий час
+                    listBoxResults.Items.Add($"⏳ Повторна перевірка через 10 сек...");
+                    await Task.Delay(10000);
+
+                    fileReport = await virusTotal.GetFileReportAsync(fileHash);
+                    if (fileReport.ResponseCode == FileReportResponseCode.Present)
+                    {
+                        await ShowReportAsync(fileReport, filePath);
+                    }
+                    else
+                    {
+                        listBoxResults.Items.Add($"❌ Файл {Path.GetFileName(filePath)} не знайдено у VirusTotal. Перевірка завершена.");
+                    }
                 }
             }
+            finally
+            {
+                semaphore.Release(); // Звільняємо слот після завершення роботи
+            }
         }
-
 
         private async Task ScanFileWithEncryptionAsync(string filePath)
         {
@@ -94,8 +111,8 @@ namespace VirusTotalWinForms
 
             if (scanResult.ResponseCode == ScanFileResponseCode.Queued)
             {
-                listBoxResults.Items.Add($"⏳ Очікування (~2 хв) обробки {Path.GetFileName(filePath)}...");
-                await Task.Delay(120000); // 2 хвилини очікування
+                listBoxResults.Items.Add($"⏳ Очікування (~1 хв) обробки {Path.GetFileName(filePath)}...");
+                await Task.Delay(60000); // 1 хвилини очікування
 
                 // Отримання звіту
                 await GetReportAsync(scanResult.Resource, filePath);
@@ -119,7 +136,6 @@ namespace VirusTotalWinForms
                 MessageBox.Show($"Файл {Path.GetFileName(filePath)} ще не оброблений на VirusTotal.", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
             }
         }
-
         private async Task ShowReportAsync(FileReport fileReport, string filePath)
         {
             int positives = fileReport.Positives;
@@ -144,9 +160,34 @@ namespace VirusTotalWinForms
 
             report.AppendLine("======================================================");
 
-            File.AppendAllText(ResultFilePath, report.ToString() + Environment.NewLine);
+            // Чекаємо 1 секунд перед записом у файл
+            await Task.Delay(1000);
+            await WriteToFileAsync(ResultFilePath, report.ToString());
+
             listBoxResults.Items.Add($"✅ {Path.GetFileName(filePath)} → Аналіз завершено");
         }
+
+        // Метод для безпечного запису в файл
+        private async Task WriteToFileAsync(string path, string content, int retryCount = 5, int delayMs = 1000)
+        {
+            for (int attempt = 0; attempt < retryCount; attempt++)
+            {
+                try
+                {
+                    using (StreamWriter writer = new StreamWriter(path, true, Encoding.UTF8, 4096))
+                    {
+                        await writer.WriteLineAsync(content);
+                    }
+                    return;
+                }
+                catch (IOException)
+                {
+                    await Task.Delay(delayMs); // Чекаємо 1 секунду перед повторною спробою
+                }
+            }
+            MessageBox.Show($"❌ Не вдалося записати результати у {path}.", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Error);
+        }
+
 
         private async void button1_Click_1(object sender, EventArgs e)
         {
@@ -154,8 +195,10 @@ namespace VirusTotalWinForms
             {
                 if (openFileDialog.ShowDialog() == DialogResult.OK)
                 {
-                    List<Task> tasks = openFileDialog.FileNames.Select(ScanOrGetReportAsync).ToList();
-                    await Task.WhenAll(tasks);
+                    await Parallel.ForEachAsync(openFileDialog.FileNames, async (filePath, _) =>
+                    {
+                        await ScanOrGetReportAsync(filePath);
+                    });
                 }
             }
         }
@@ -173,37 +216,6 @@ namespace VirusTotalWinForms
             }
         }
 
-        private void button3_Click_1(object sender, EventArgs e)
-        {
-            if (listBoxResults.SelectedItem != null)
-            {
-                string selectedEntry = listBoxResults.SelectedItem.ToString();
-                listBoxResults.Items.Remove(selectedEntry);
-
-                var lines = File.ReadAllLines(ResultFilePath);
-                File.WriteAllLines(ResultFilePath, lines.Where(line => line != selectedEntry).ToArray());
-
-                MessageBox.Show("Запис видалено!", "Успіх", MessageBoxButtons.OK, MessageBoxIcon.Information);
-            }
-        }
-
-        private void button4_Click_1(object sender, EventArgs e)
-        {
-            if (listBoxResults.SelectedItem != null)
-            {
-                string selectedEntry = listBoxResults.SelectedItem.ToString();
-                string report = File.ReadAllText(ResultFilePath);
-
-                if (report.Contains(selectedEntry))
-                {
-                    MessageBox.Show(report, "Детальна інформація", MessageBoxButtons.OK, MessageBoxIcon.Information);
-                }
-                else
-                {
-                    MessageBox.Show("Детальна інформація не знайдена!", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
-                }
-            }
-        }
         private static string ComputeSHA256(string filePath)
         {
             using (var sha256 = SHA256.Create())
@@ -213,6 +225,5 @@ namespace VirusTotalWinForms
                 return BitConverter.ToString(hash).Replace("-", "").ToLower();
             }
         }
-
     }
 }
