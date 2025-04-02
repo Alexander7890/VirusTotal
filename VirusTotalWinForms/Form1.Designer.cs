@@ -46,9 +46,10 @@
             // button1
             // 
             button1.BackColor = Color.YellowGreen;
+            button1.Font = new Font("Segoe UI", 11F);
             button1.Location = new Point(504, 21);
             button1.Name = "button1";
-            button1.Padding = new Padding(10);
+            button1.Padding = new Padding(8);
             button1.RightToLeft = RightToLeft.Yes;
             button1.Size = new Size(132, 79);
             button1.TabIndex = 1;
@@ -59,9 +60,10 @@
             // button3
             // 
             button3.BackColor = Color.Tomato;
+            button3.Font = new Font("Segoe UI", 11F);
             button3.Location = new Point(504, 120);
             button3.Name = "button3";
-            button3.Padding = new Padding(10);
+            button3.Padding = new Padding(3);
             button3.RightToLeft = RightToLeft.Yes;
             button3.Size = new Size(132, 79);
             button3.TabIndex = 3;
