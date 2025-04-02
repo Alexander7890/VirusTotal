@@ -18,7 +18,7 @@ namespace VirusTotalWinForms
         private const string ApiKey = "4ff03d06d0beaa010e499cd2d28bdf94da10451698b230f708895418cafe0d86";
         private const string ResultFilePath = "results.txt";
 
-
+        private System.Windows.Forms.Timer resultsUpdateTimer;
         private readonly VirusTotal virusTotal;
         private readonly SemaphoreSlim semaphore = new SemaphoreSlim(4); // Дозволяє одночасно запускати 4 файлів
 
@@ -27,6 +27,13 @@ namespace VirusTotalWinForms
             InitializeComponent();
             virusTotal = new VirusTotal(ApiKey);
             virusTotal.UseTLS = true;
+
+            // Ініціалізація таймера
+            resultsUpdateTimer = new System.Windows.Forms.Timer();
+            resultsUpdateTimer.Interval = 5000; // Оновлення кожні 5 сек
+            resultsUpdateTimer.Tick += (s, e) => LoadResults();
+            resultsUpdateTimer.Start();
+
             LoadResults();
         }
 
@@ -188,7 +195,6 @@ namespace VirusTotalWinForms
             MessageBox.Show($"❌ Не вдалося записати результати у {path}.", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Error);
         }
 
-
         private async void button1_Click_1(object sender, EventArgs e)
         {
             using (OpenFileDialog openFileDialog = new OpenFileDialog { Multiselect = true })
@@ -203,16 +209,16 @@ namespace VirusTotalWinForms
             }
         }
 
-        private void button2_Click_1(object sender, EventArgs e)
+        private void button3_Click(object sender, EventArgs e)
         {
-            if (File.Exists(ResultFilePath))
+            try
             {
-                string results = File.ReadAllText(ResultFilePath);
-                MessageBox.Show(results, "Історія перевірок", MessageBoxButtons.OK, MessageBoxIcon.Information);
+                File.WriteAllText(ResultFilePath, string.Empty);
+                listBoxResults.Items.Clear();
             }
-            else
+            catch (Exception ex)
             {
-                MessageBox.Show("Файл з результатами відсутній!", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Warning);
+                MessageBox.Show($"Помилка очищення файлу: {ex.Message}", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Error);
             }
         }
 

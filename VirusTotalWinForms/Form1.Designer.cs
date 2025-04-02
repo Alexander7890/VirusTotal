@@ -28,11 +28,10 @@
         /// </summary>
         private void InitializeComponent()
         {
+            System.ComponentModel.ComponentResourceManager resources = new System.ComponentModel.ComponentResourceManager(typeof(Form1));
             listBoxResults = new ListBox();
             button1 = new Button();
-            button2 = new Button();
             button3 = new Button();
-            button4 = new Button();
             SuspendLayout();
             // 
             // listBoxResults
@@ -41,57 +40,46 @@
             listBoxResults.ItemHeight = 15;
             listBoxResults.Location = new Point(12, 12);
             listBoxResults.Name = "listBoxResults";
-            listBoxResults.Size = new Size(396, 424);
+            listBoxResults.Size = new Size(452, 634);
             listBoxResults.TabIndex = 0;
             // 
             // button1
             // 
-            button1.Location = new Point(485, 70);
+            button1.BackColor = Color.YellowGreen;
+            button1.Location = new Point(504, 21);
             button1.Name = "button1";
-            button1.Size = new Size(75, 23);
+            button1.Padding = new Padding(10);
+            button1.RightToLeft = RightToLeft.Yes;
+            button1.Size = new Size(132, 79);
             button1.TabIndex = 1;
-            button1.Text = "button1";
-            button1.UseVisualStyleBackColor = true;
+            button1.Text = "Додати файл для перевірки ";
+            button1.UseVisualStyleBackColor = false;
             button1.Click += button1_Click_1;
-            // 
-            // button2
-            // 
-            button2.Location = new Point(483, 115);
-            button2.Name = "button2";
-            button2.Size = new Size(75, 23);
-            button2.TabIndex = 2;
-            button2.Text = "button2";
-            button2.UseVisualStyleBackColor = true;
-            button2.Click += button2_Click_1;
             // 
             // button3
             // 
-            button3.Location = new Point(483, 154);
+            button3.BackColor = Color.Tomato;
+            button3.Location = new Point(504, 120);
             button3.Name = "button3";
-            button3.Size = new Size(75, 23);
+            button3.Padding = new Padding(10);
+            button3.RightToLeft = RightToLeft.Yes;
+            button3.Size = new Size(132, 79);
             button3.TabIndex = 3;
-            button3.Text = "button3";
-            button3.UseVisualStyleBackColor = true;
-            // 
-            // button4
-            // 
-            button4.Location = new Point(480, 193);
-            button4.Name = "button4";
-            button4.Size = new Size(78, 31);
-            button4.TabIndex = 4;
-            button4.Text = "button4";
-            button4.UseVisualStyleBackColor = true;
+            button3.Text = "Очистити файл з результатами";
+            button3.UseVisualStyleBackColor = false;
+            button3.Click += button3_Click;
             // 
             // Form1
             // 
             AutoScaleDimensions = new SizeF(7F, 15F);
             AutoScaleMode = AutoScaleMode.Font;
-            ClientSize = new Size(800, 450);
-            Controls.Add(button4);
+            BackgroundImage = (Image)resources.GetObject("$this.BackgroundImage");
+            BackgroundImageLayout = ImageLayout.Stretch;
+            ClientSize = new Size(645, 667);
             Controls.Add(button3);
-            Controls.Add(button2);
             Controls.Add(button1);
             Controls.Add(listBoxResults);
+            DoubleBuffered = true;
             Name = "Form1";
             Text = "Form1";
             ResumeLayout(false);
@@ -101,8 +89,6 @@
 
         private ListBox listBoxResults;
         private Button button1;
-        private Button button2;
         private Button button3;
-        private Button button4;
     }
 }
