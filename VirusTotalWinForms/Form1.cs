@@ -52,7 +52,7 @@ namespace VirusTotalWinForms
             try
             {
                 FileInfo fileInfo = new FileInfo(filePath);
-                if (fileInfo.Length > 32766 * 1024) // Перевірка на розмір файлу
+                if (fileInfo.Length > 600000 * 1024) // Перевірка на розмір файлу
                 {
                     MessageBox.Show("Файл перевищує максимальний розмір (32 MB) для завантаження на VirusTotal.", "Помилка", MessageBoxButtons.OK, MessageBoxIcon.Error);
                     return;

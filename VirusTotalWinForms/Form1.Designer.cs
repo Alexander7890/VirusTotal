@@ -53,7 +53,7 @@
             button1.RightToLeft = RightToLeft.Yes;
             button1.Size = new Size(132, 79);
             button1.TabIndex = 1;
-            button1.Text = "Додати файл для перевірки ";
+            button1.Text = "Додати файл\r\n для перевірки ";
             button1.UseVisualStyleBackColor = false;
             button1.Click += button1_Click_1;
             // 
